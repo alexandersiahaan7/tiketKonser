@@ -1,0 +1,459 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use App\Models\Ticket;
+
+class TicketController extends Controller
+{
+    public function create()
+    {
+        return view('tickets.create');
+    }
+
+    public function store(Request $request)
+    {
+        $validatedData = $request->validate([
+            'name' => 'required',
+            'email' => 'required|email',
+            'phone' => 'required',
+        ]);
+
+        $ticketCode = 'TICKET-' . strtoupper(str_random(8));
+
+        $ticket = new Ticket;
+        $ticket->name = $validatedData['name'];
+        $ticket->email = $validatedData['email'];
+        $ticket->phone = $validatedData['phone'];
+        $ticket->ticket_code = $ticketCode;
+        $ticket->save();
+
+        return redirect()->route('ticket.show', $ticket->id);
+    }
+
+    public function show($id)
+    {
+        $ticket = Ticket::findOrFail($id);
+
+        return view('tickets.show', compact('ticket'));
+    }
+}
+<!-- resources/views/tickets/show.blade.php -->
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Tiket Konser</title>
+</head>
+<body>
+    <h1>Tiket Konser</h1>
+    <p>Nomor Tiket: {{ $ticket->ticket_code }}</p>
+    <p>Nama: {{ $ticket->name }}</p>
+    <p>Email: {{ $ticket->email }}</p>
+    <p>Nomor Telepon: {{ $ticket->phone }}</p>
+</body>
+</html>
+Route::get('/ticket/{id}', [TicketController::class, 'show'])->name('ticket.show');
+php artisan serve
+use Illuminate\Support\Facades\Mail;
+use App\Mail\TicketConfirmation;
+
+public function store(Request $request)
+{
+    // Kode sebelumnya...
+
+    // Mengirim email konfirmasi pemesanan
+    Mail::to($validatedData['email'])->send(new TicketConfirmation($ticket));
+
+    return redirect()->route('ticket.show', $ticket->id);
+}
+php artisan make:mail TicketConfirmation --markdown=emails.ticket_confirmation
+@component('mail::message')
+# Konfirmasi Pemesanan Tiket Konser
+
+Halo {{ $ticket->name }},
+
+Terima kasih telah memesan tiket konser. Berikut adalah informasi tiket Anda:
+
+- Nomor Tiket: {{ $ticket->ticket_code }}
+- Nama: {{ $ticket->name }}
+- Email: {{ $ticket->email }}
+- Nomor Telepon: {{ $ticket->phone }}
+
+Terima kasih dan selamat menikmati konser!
+
+Terima kasih,<br>
+{{ config('app.name') }}
+@endcomponent
+<?php
+
+namespace App\Mail;
+
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Mail\Mailable;
+use Illuminate\Queue\SerializesModels;
+use App\Models\Ticket;
+
+class TicketConfirmation extends Mailable
+{
+    use Queueable, SerializesModels;
+
+    public $ticket;
+
+    public function __construct(Ticket $ticket)
+    {
+        $this->ticket = $ticket;
+    }
+
+    public function build()
+    {
+        return $this->markdown('emails.ticket_confirmation');
+    }
+}
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.mailtrap.io
+MAIL_PORT=2525
+MAIL_USERNAME=null
+MAIL_PASSWORD=null
+MAIL_ENCRYPTION=null
+MAIL_FROM_ADDRESS=null
+MAIL_FROM_NAME="${APP_NAME}"
+$validatedData = $request->validate([
+    'name' => 'required',
+    'email' => 'required|email',
+    'phone' => 'required|unique:tickets',
+]);
+<!-- resources/views/admin/index.blade.php -->
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Daftar Pemesanan Tiket Konser</title>
+</head>
+<body>
+    <h1>Daftar Pemesanan Tiket Konser</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>Nomor Tiket</th>
+                <th>Nama</th>
+                <th>Email</th>
+                <th>Nomor Telepon</th>
+                <th>Aksi</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach ($tickets as $ticket)
+            <tr>
+                <td>{{ $ticket->ticket_code }}</td>
+                <td>{{ $ticket->name }}</td>
+                <td>{{ $ticket->email }}</td>
+                <td>{{ $ticket->phone }}</td>
+                <td>
+                    <a href="{{ route('admin.edit', $ticket->id) }}">Edit</a>
+                    <form action="{{ route('admin.delete', $ticket->id) }}" method="POST" style="display:inline">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            @endforeach
+        </tbody>
+    </table>
+</body>
+</html>
+public function show($id)
+{
+    $ticket = Ticket::findOrFail($id);
+
+    if (Auth::check()) {
+        return view('tickets.show', compact('ticket'));
+    } else {
+        return view('admin.show', compact('ticket'));
+    }
+}
+<!-- resources/views/admin/edit.blade.php -->
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Edit Pemesanan Tiket Konser</title>
+</head>
+<body>
+    <h1>Edit Pemesanan Tiket Konser</h1>
+    <form method="POST" action="{{ route('admin.update', $ticket->id) }}">
+        @csrf
+        @method('PUT')
+        <label for="name">Nama:</label><br>
+        <input type="text" id="name" name="name" value="{{ $ticket->name }}" required><br><br>
+        <label for="email">Email:</label><br>
+        <input type="email" id="email" name="email" value="{{ $ticket->email }}" required><br><br>
+        <label for="phone">Nomor Telepon:</label><br>
+        <input type="text" id="phone" name="phone" value="{{ $ticket->phone }}" required><br><br>
+        <button type="submit">Update</button>
+    </form>
+</body>
+</html>
+public function update(Request $request, $id)
+{
+    $ticket = Ticket::findOrFail($id);
+
+    $validatedData = $request->validate([
+        'name' => 'required',
+        'email' => 'required|email',
+        'phone' => 'required',
+    ]);
+
+    $ticket->name = $validatedData['name'];
+    $ticket->email = $validatedData['email'];
+    $ticket->phone = $validatedData['phone'];
+    $ticket->save();
+
+    return redirect()->route('admin.index')->with('success', 'Data tiket berhasil diperbarui');
+}
+public function destroy($id)
+{
+    $ticket = Ticket::findOrFail($id);
+    $ticket->delete();
+
+    return redirect()->route('admin.index')->with('success', 'Data tiket berhasil dihapus');
+}
+protected $routeMiddleware = [
+    // ...
+    'auth' => \App\Http\Middleware\Authenticate::class,
+    // ...
+];
+use App\Http\Controllers\CheckInController;
+
+Route::get('/checkin', [CheckInController::class, 'index'])->name('checkin.index');
+Route::post('/checkin', [CheckInController::class, 'verify'])->name('checkin.verify');
+php artisan make:controller CheckInController
+namespace App\Http\Controllers;
+
+use App\Models\Ticket;
+use Illuminate\Http\Request;
+
+class CheckInController extends Controller
+{
+    public function index()
+    {
+        return view('checkin.index');
+    }
+
+    public function verify(Request $request)
+    {
+        $ticketID = $request->input('ticket_id');
+
+        // Periksa apakah nomor ID tiket valid
+        $ticket = Ticket::where('ticket_code', $ticketID)->first();
+
+        if ($ticket) {
+            // Periksa apakah tiket telah digunakan sebelumnya
+            if ($ticket->checked_in) {
+                return redirect()->back()->with('error', 'Tiket dengan nomor ID tersebut sudah digunakan.');
+            }
+
+            // Tandai tiket sebagai telah digunakan
+            $ticket->checked_in = true;
+            $ticket->save();
+
+            return redirect()->back()->with('success', 'Check-in berhasil. Selamat menikmati konser!');
+        }
+
+        return redirect()->back()->with('error', 'Nomor ID tiket tidak valid.');
+    }
+}
+<!-- resources/views/checkin/index.blade.php -->
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Check-In Tiket Konser</title>
+</head>
+<body>
+    <h1>Check-In Tiket Konser</h1>
+
+    @if (session('error'))
+        <div>{{ session('error') }}</div>
+    @endif
+
+    @if (session('success'))
+        <div>{{ session('success') }}</div>
+    @endif
+
+    <form method="POST" action="{{ route('checkin.verify') }}">
+        @csrf
+        <label for="ticket_id">Nomor ID Tiket:</label>
+        <input type="text" id="ticket_id" name="ticket_id" required>
+        <button type="submit">Check-In</button>
+    </form>
+</body>
+</html>
+<li class="nav-item">
+    <a class="nav-link" href="{{ route('checkin.index') }}">Check-In</a>
+</li>
+protected $routeMiddleware = [
+    // ...
+    'auth' => \App\Http\Middleware\Authenticate::class,
+    // ...
+];
+php artisan make:middleware CheckInStaff
+namespace App\Http\Middleware;
+
+use Closure;
+use Illuminate\Http\Request;
+
+class CheckInStaff
+{
+    public function handle(Request $request, Closure $next)
+    {
+        // Periksa apakah pengguna yang sedang login memiliki akses sebagai staf check-in
+        if (auth()->user()->isCheckInStaff()) {
+            return $next($request);
+        }
+
+        return redirect()->route('login'); // Ganti dengan rute login yang sesuai
+    }
+}
+use App\Http\Middleware\CheckInStaff;
+
+Route::middleware(['auth', 'checkin.staff'])->group(function () {
+    Route::get('/checkin', [CheckInController::class, 'index'])->name('checkin.index');
+    Route::post('/checkin', [CheckInController::class, 'verify'])->name('checkin.verify');
+});
+use App\Http\Controllers\ReportController;
+
+Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+php artisan make:controller ReportController
+namespace App\Http\Controllers;
+
+use App\Models\Ticket;
+use Illuminate\Http\Request;
+
+class ReportController extends Controller
+{
+    public function index()
+    {
+        $checkedInTickets = Ticket::where('checked_in', true)->get();
+        $notCheckedInTickets = Ticket::where('checked_in', false)->get();
+
+        return view('reports.index', compact('checkedInTickets', 'notCheckedInTickets'));
+    }
+}
+<!-- resources/views/reports/index.blade.php -->
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Laporan Check-In Tiket Konser</title>
+</head>
+<body>
+    <h1>Laporan Check-In Tiket Konser</h1>
+
+    <h2>Tiket yang Sudah Check-In</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Nomor ID Tiket</th>
+                <th>Nama</th>
+                <th>Email</th>
+                <th>Nomor Telepon</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach ($checkedInTickets as $ticket)
+                <tr>
+                    <td>{{ $ticket->ticket_code }}</td>
+                    <td>{{ $ticket->name }}</td>
+                    <td>{{ $ticket->email }}</td>
+                    <td>{{ $ticket->phone }}</td>
+                </tr>
+            @endforeach
+        </tbody>
+    </table>
+
+    <h2>Tiket yang Belum Check-In</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Nomor ID Tiket</th>
+                <th>Nama</th>
+                <th>Email</th>
+                <th>Nomor Telepon</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach ($notCheckedInTickets as $ticket)
+                <tr>
+                    <td>{{ $ticket->ticket_code }}</td>
+                    <td>{{ $ticket->name }}</td>
+                    <td>{{ $ticket->email }}</td>
+                    <td>{{ $ticket->phone }}</td>
+                </tr>
+            @endforeach
+        </tbody>
+    </table>
+</body>
+</html>
+protected $routeMiddleware = [
+    // ...
+    'auth' => \App\Http\Middleware\Authenticate::class,
+    // ...
+];
+<li class="nav-item">
+    <a class="nav-link" href="{{ route('reports.index') }}">Laporan</a>
+</li>
+protected $routeMiddleware = [
+    // ...
+    'checkin.staff' => \App\Http\Middleware\CheckInStaff::class,
+    // ...
+];
+php artisan make:middleware CheckInStaff
+namespace App\Http\Middleware;
+
+use Closure;
+use Illuminate\Http\Request;
+
+class CheckInStaff
+{
+    public function handle(Request $request, Closure $next)
+    {
+        // Periksa apakah pengguna yang sedang login memiliki akses sebagai staf check-in
+        if (auth()->user()->isCheckInStaff()) {
+            return $next($request);
+        }
+
+        return redirect()->route('login'); // Ganti dengan rute login yang sesuai
+    }
+}
+use App\Http\Middleware\CheckInStaff;
+
+Route::middleware(['auth', 'checkin.staff'])->group(function () {
+    Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
